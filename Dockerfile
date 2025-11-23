@@ -47,6 +47,9 @@ COPY wyoming_satellite/ ./wyoming_satellite/
 # Run the normal setup first
 RUN script/setup
 
+# --- Add numpy for Silero VAD padding ---
+RUN /app/.venv/bin/pip install --no-cache-dir numpy
+
 # --- NEW: Install Silero VAD and PyTorch ---
 # Activate the virtualenv created by script/setup
 RUN /app/.venv/bin/pip install --no-cache-dir torch pysilero-vad
