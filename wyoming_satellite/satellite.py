@@ -106,9 +106,9 @@ class SatelliteBase:
                 "wake",
                 ring_buffer_size=(2 * 16000 * 2 * 1),  # last 2 sec
             )
-            self.stt_audio_writer = DebugAudioWriter(
-                settings.debug_recording_dir, "stt"
-            )
+            # self.stt_audio_writer = DebugAudioWriter(
+            #     settings.debug_recording_dir, "stt"
+            # )
 
     @property
     def is_running(self) -> bool:
