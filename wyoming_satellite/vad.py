@@ -1,10 +1,11 @@
-"""Voice activity detection with Silero VAD and internal buffering."""
+"""Voice activity detection with Silero VAD and proper chunking."""
+
 from typing import Optional
 import numpy as np
 
 
 class SileroVad:
-    """Voice activity detection with Silero VAD."""
+    """Voice activity detection with silero VAD."""
 
     def __init__(self, threshold: float, trigger_level: int) -> None:
         from pysilero_vad import SileroVoiceActivityDetector
@@ -14,15 +15,15 @@ class SileroVad:
         self.trigger_level = trigger_level
         self._activation = 0
 
-        # Internal buffer to accumulate audio until we have a full chunk
+        # Internal buffer for samples
         self._buffer = np.zeros(0, dtype=np.int16)
 
-        # Silero expects chunks of 320 samples (20 ms at 16 kHz)
-        self.chunk_size = 320
+        # Dynamically get the chunk size in **samples**
+        self.chunk_samples = self.detector.chunk_samples()
 
     def __call__(self, audio_bytes: Optional[bytes]) -> bool:
         if audio_bytes is None:
-            # Reset state
+            # Reset everything
             self._activation = 0
             self.detector.reset()
             self._buffer = np.zeros(0, dtype=np.int16)
@@ -34,15 +35,19 @@ class SileroVad:
         # Append to internal buffer
         self._buffer = np.concatenate((self._buffer, samples))
 
-        # Process all full chunks
+        # Process full chunks
         speech_detected = False
-        while len(self._buffer) >= self.chunk_size:
-            chunk = self._buffer[:self.chunk_size]
-            self._buffer = self._buffer[self.chunk_size:]
+        while len(self._buffer) >= self.chunk_samples:
+            # Slice exactly one chunk
+            chunk = self._buffer[:self.chunk_samples]
+            self._buffer = self._buffer[self.chunk_samples:]
 
-            # Convert back to bytes for Silero
+            # Convert chunk back to raw bytes
             chunk_bytes = chunk.tobytes()
-            if self.detector(chunk_bytes) >= self.threshold:
+
+            # Pass to Silero detector
+            score = self.detector(chunk_bytes)
+            if score >= self.threshold:
                 self._activation += 1
                 if self._activation >= self.trigger_level:
                     self._activation = 0
