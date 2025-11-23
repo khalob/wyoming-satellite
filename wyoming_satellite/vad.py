@@ -1,5 +1,6 @@
 """Voice activity detection."""
 from typing import Optional
+import numpy as np
 
 
 class SileroVad:
@@ -19,6 +20,17 @@ class SileroVad:
             self._activation = 0
             self.detector.reset()
             return False
+
+        # --- NEW: Pad audio to valid chunk size ---
+        # Silero expects chunks of 320 samples (20 ms at 16 kHz)
+        chunk_size = 320
+        samples = np.frombuffer(audio_bytes, dtype=np.int16)
+        remainder = len(samples) % chunk_size
+        if remainder != 0:
+            pad_amount = chunk_size - remainder
+            samples = np.pad(samples, (0, pad_amount), mode="constant")
+        audio_bytes = samples.tobytes()
+        # --- END NEW ---
 
         if self.detector(audio_bytes) >= self.threshold:
             # Speech detected
