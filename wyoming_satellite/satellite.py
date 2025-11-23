@@ -97,9 +97,6 @@ class SatelliteBase:
         self.microphone_muted = False
         self._unmute_microphone_task: Optional[asyncio.Task] = None
 
-        # Pre-wake ring buffer (2 seconds, 16kHz, 16-bit mono)
-        self._wake_ring = RingBuffer(maxlen=2 * 16000 * 2)
-
         # Debug audio recording
         self.wake_audio_writer: Optional[DebugAudioWriter] = None
         self.stt_audio_writer: Optional[DebugAudioWriter] = None
@@ -109,9 +106,9 @@ class SatelliteBase:
                 "wake",
                 ring_buffer_size=(2 * 16000 * 2 * 1),  # last 2 sec
             )
-            # self.stt_audio_writer = DebugAudioWriter(
-            #     settings.debug_recording_dir, "stt"
-            # )
+            self.stt_audio_writer = DebugAudioWriter(
+                settings.debug_recording_dir, "stt"
+            )
 
     @property
     def is_running(self) -> bool:
@@ -1307,10 +1304,6 @@ class WakeStreamingSatellite(SatelliteBase):
             if self.wake_audio_writer is not None:
                 self.wake_audio_writer.write(audio_bytes)
 
-            # Add pre-wake audio into ring buffer
-            if hasattr(self, "_wake_ring") and (self._wake_ring is not None):
-                self._wake_ring.put(audio_bytes)
-
             if self.stt_audio_writer is not None:
                 self.stt_audio_writer.write(audio_bytes)
 
@@ -1345,24 +1338,6 @@ class WakeStreamingSatellite(SatelliteBase):
             # Stop debug recording (wake)
             if self.wake_audio_writer is not None:
                 self.wake_audio_writer.stop()
-
-            # Write pre-wake ring buffer to WAV
-            if hasattr(self, "_wake_ring") and (self._wake_ring is not None):
-                try:
-                    ts = self._debug_recording_timestamp or time.monotonic_ns()
-                    out_path = (
-                        Path(self.settings.debug_recording_dir)
-                        / f"wake_{ts}.wav"
-                    )
-                    with wave.open(str(out_path), "wb") as wav_file:
-                        wav_file.setnchannels(self.settings.mic.channels)
-                        wav_file.setsampwidth(self.settings.mic.width)
-                        wav_file.setframerate(self.settings.mic.rate)
-                        wav_file.writeframes(self._wake_ring.getvalue())
-                    _LOGGER.debug(f"Wrote pre-wake audio → {out_path}")
-                except Exception:
-                    _LOGGER.exception("Failed to write pre-wake audio")
-
 
             # Start debug recording (stt)
             if self.stt_audio_writer is not None:
